@@ -40,11 +40,10 @@ def create_expense(expense: ExpenseCreate):
 @app.get("/expenses", response_model=list[ExpenseRead])
 def get_expenses(kategorie: Optional[str] = None):
     with Session(engine) as session:
-        query = select(Expense)
+        abfrage = select(Expense)
         if kategorie:
-            query = query.where(Expense.kategorie == kategorie)
-        expenses = session.exec(query).all()
-        return expenses
+            abfrage = abfrage.where(Expense.kategorie == kategorie)
+        return session.exec(abfrage).all()
 
 @app.delete("/expenses/{expense_id}")
 @app.put("/expenses/{expense_id}", response_model=ExpenseRead)
@@ -68,3 +67,13 @@ def delete_expense(expense_id: int):
         session.delete(expense)
         session.commit()
         return {"message": f"Ausgabe {expense_id} gelöscht"}
+    
+@app.delete("/expenses/{expense_id}")
+def delete_expense(expense_id: int):
+    with Session(engine) as session:
+        expense = session.get(Expense, expense_id)
+        if not expense:
+            raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
+        session.delete(expense)
+        session.commit()
+        return {"ok": True, "geloescht": expense_id}
