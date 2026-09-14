@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finanz-Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papier:  #f1f3f0;
+    --tinte:   #1c2320;
+    --gedimmt: #6a746e;
+    --linie:   #d8dcd6;
+    --gruen:   #1f6f5c;
+    --rot:     #a33b2e;
+    --weiss:   #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 2rem 1.25rem 4rem;
+    background: var(--papier);
+    color: var(--tinte);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .huelle { max-width: 44rem; margin: 0 auto; }
+
+  /* --- Kopfbereich mit Gesamtsumme --- */
+  header { border-bottom: 2px solid var(--tinte); padding-bottom: 1.5rem; }
+
+  header h1 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gedimmt);
+    letter-spacing: 0.01em;
+  }
+
+  #summe {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: clamp(2.75rem, 12vw, 4.5rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  #summe-hinweis { margin: 0.5rem 0 0; color: var(--gedimmt); font-size: 0.9rem; }
+
+  /* --- Formular --- */
+  form { margin: 2rem 0 0; }
+
+  .felder {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .feld { display: flex; flex-direction: column; gap: 0.3rem; }
+  .feld.breit { grid-column: 1 / -1; }
+
+  label { font-size: 0.85rem; color: var(--gedimmt); }
+
+  input, select {
+    font: inherit;
+    color: inherit;
+    padding: 0.6rem 0.7rem;
+    background: var(--weiss);
+    border: 1px solid var(--linie);
+    border-radius: 3px;
+  }
+
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--gruen);
+    outline-offset: 1px;
+  }
+
+  button {
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    border-radius: 3px;
+  }
+
+  #speichern {
+    margin-top: 0.9rem;
+    width: 100%;
+    padding: 0.7rem;
+    background: var(--gruen);
+    color: var(--weiss);
+  }
+
+  #speichern:disabled { opacity: 0.55; cursor: progress; }
+
+  /* --- Filterzeile --- */
+  .filterzeile {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--linie);
+  }
+
+  .filterzeile label { flex: 0 0 auto; }
+  .filterzeile select { flex: 1 1 auto; padding: 0.4rem 0.5rem; }
+
+  /* --- Liste --- */
+  ul { list-style: none; margin: 0; padding: 0; }
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--linie);
+  }
+
+  .titel { font-weight: 500; }
+  .zusatz { display: block; font-size: 0.85rem; color: var(--gedimmt); font-weight: 400; }
+  .betrag { font-weight: 600; }
+
+  .loeschen {
+    padding: 0.25rem 0.5rem;
+    background: none;
+    color: var(--gedimmt);
+    border: 1px solid var(--linie);
+  }
+
+  .loeschen:hover { color: var(--rot); border-color: var(--rot); }
+
+  #meldung { margin: 1.25rem 0 0; color: var(--gedimmt); }
+  #meldung.fehler { color: var(--rot); }
+</style>
+</head>
+<body>
+<div class="huelle">
+
+  <header>
+    <h1>Ausgaben insgesamt</h1>
+    <span id="summe">0,00 €</span>
+    <p id="summe-hinweis">Noch nichts erfasst.</p>
+  </header>
+
+  <form id="formular">
+    <div class="felder">
+      <div class="feld">
+        <label for="betrag">Betrag in Euro</label>
+        <input type="number" id="betrag" step="0.01" min="0" required>
+      </div>
+      <div class="feld">
+        <label for="datum">Datum</label>
+        <input type="date" id="datum" required>
+      </div>
+      <div class="feld breit">
+        <label for="kategorie">Kategorie</label>
+        <input type="text" id="kategorie" list="kategorien" placeholder="z. B. Lebensmittel" required>
+        <datalist id="kategorien"></datalist>
+      </div>
+      <div class="feld breit">
+        <label for="notiz">Notiz (optional)</label>
+        <input type="text" id="notiz" placeholder="z. B. Wocheneinkauf">
+      </div>
+    </div>
+    <button type="submit" id="speichern">Ausgabe eintragen</button>
+  </form>
+
+  <div class="filterzeile">
+    <label for="filter">Zeigen:</label>
+    <select id="filter">
+      <option value="">Alle Kategorien</option>
+    </select>
+  </div>
+
+  <ul id="liste"></ul>
+  <p id="meldung"></p>
+
+</div>
+
+<script>
+// Adresse deines Backends. Zum lokalen Testen auf "http://localhost:8000" umstellen.
+const API = "https://finanz-tracker-backend-3knj.onrender.com";
+
+const formular  = document.getElementById("formular");
+const speichern = document.getElementById("speichern");
+const filter    = document.getElementById("filter");
+const liste     = document.getElementById("liste");
+const meldung   = document.getElementById("meldung");
+const summe     = document.getElementById("summe");
+const hinweis   = document.getElementById("summe-hinweis");
+const vorschlaege = document.getElementById("kategorien");
+
+const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+
+// Alle bisher verwendeten Kategorien, damit Filter und Vorschlagsliste gefüllt sind.
+let alleKategorien = [];
+
+function zeigeMeldung(text, istFehler = false) {
+  meldung.textContent = text;
+  meldung.classList.toggle("fehler", istFehler);
+}
+
+// Heutiges Datum als Vorbelegung im Formular.
+document.getElementById("datum").valueAsDate = new Date();
+
+// --- Ausgaben laden und anzeigen ---
+async function ladeAusgaben() {
+  const kategorie = filter.value;
+  const adresse = kategorie
+    ? `${API}/expenses?kategorie=${encodeURIComponent(kategorie)}`
+    : `${API}/expenses`;
+
+  zeigeMeldung("Lade Daten … (beim ersten Mal kann das bis zu einer Minute dauern)");
+
+  try {
+    const antwort = await fetch(adresse);
+    if (!antwort.ok) throw new Error("Server antwortet mit Status " + antwort.status);
+    const ausgaben = await antwort.json();
+    zeichneListe(ausgaben);
+    zeigeMeldung("");
+  } catch (fehler) {
+    zeigeMeldung("Keine Verbindung zum Backend: " + fehler.message, true);
+  }
+}
+
+function zeichneListe(ausgaben) {
+  liste.innerHTML = "";
+
+  // Neueste zuerst.
+  ausgaben.sort((a, b) => b.datum.localeCompare(a.datum));
+
+  for (const a of ausgaben) {
+    const zeile = document.createElement("li");
+
+    const text = document.createElement("span");
+    text.className = "titel";
+    text.textContent = a.kategorie;
+
+    const zusatz = document.createElement("span");
+    zusatz.className = "zusatz";
+    const datum = new Date(a.datum).toLocaleDateString("de-DE");
+    zusatz.textContent = a.notiz ? `${datum} · ${a.notiz}` : datum;
+    text.appendChild(zusatz);
+
+    const betrag = document.createElement("span");
+    betrag.className = "betrag";
+    betrag.textContent = euro.format(a.betrag);
+
+    const knopf = document.createElement("button");
+    knopf.className = "loeschen";
+    knopf.type = "button";
+    knopf.textContent = "Löschen";
+    knopf.setAttribute("aria-label", `${a.kategorie} vom ${datum} löschen`);
+    knopf.addEventListener("click", () => loesche(a.id, a.kategorie));
+
+    zeile.append(text, betrag, knopf);
+    liste.appendChild(zeile);
+  }
+
+  const gesamt = ausgaben.reduce((s, a) => s + a.betrag, 0);
+  summe.textContent = euro.format(gesamt);
+
+  if (ausgaben.length === 0) {
+    hinweis.textContent = filter.value
+      ? `Keine Ausgaben in der Kategorie ${filter.value}.`
+      : "Noch nichts erfasst. Trag unten deine erste Ausgabe ein.";
+  } else {
+    const wort = ausgaben.length === 1 ? "Eintrag" : "Einträge";
+    hinweis.textContent = filter.value
+      ? `${ausgaben.length} ${wort} in ${filter.value}`
+      : `${ausgaben.length} ${wort}`;
+  }
+
+  // Kategorienliste nur aus der ungefilterten Ansicht aufbauen.
+  if (!filter.value) {
+    alleKategorien = [...new Set(ausgaben.map(a => a.kategorie))].sort();
+    fuelleKategorien();
+  }
+}
+
+function fuelleKategorien() {
+  const gewaehlt = filter.value;
+  filter.innerHTML = '<option value="">Alle Kategorien</option>';
+  vorschlaege.innerHTML = "";
+
+  for (const k of alleKategorien) {
+    const option = document.createElement("option");
+    option.value = k;
+    option.textContent = k;
+    filter.appendChild(option);
+
+    const vorschlag = document.createElement("option");
+    vorschlag.value = k;
+    vorschlaege.appendChild(vorschlag);
+  }
+  filter.value = gewaehlt;
+}
+
+// --- Neue Ausgabe anlegen ---
+formular.addEventListener("submit", async (ereignis) => {
+  ereignis.preventDefault();           // verhindert das Neuladen der Seite
+  speichern.disabled = true;
+  speichern.textContent = "Wird gespeichert …";
+
+  const daten = {
+    betrag:    parseFloat(document.getElementById("betrag").value),
+    kategorie: document.getElementById("kategorie").value.trim(),
+    datum:     document.getElementById("datum").value,
+    notiz:     document.getElementById("notiz").value.trim() || null
+  };
+
+  try {
+    const antwort = await fetch(`${API}/expenses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(daten)
+    });
+    if (!antwort.ok) throw new Error("Status " + antwort.status);
+
+    document.getElementById("betrag").value = "";
+    document.getElementById("notiz").value = "";
+    filter.value = "";                 // zurück auf die Gesamtansicht
+    await ladeAusgaben();
+  } catch (fehler) {
+    zeigeMeldung("Speichern fehlgeschlagen: " + fehler.message, true);
+  } finally {
+    speichern.disabled = false;
+    speichern.textContent = "Ausgabe eintragen";
+  }
+});
+
+// --- Ausgabe löschen ---
+async function loesche(id, kategorie) {
+  if (!confirm(`Ausgabe "${kategorie}" wirklich löschen?`)) return;
+
+  try {
+    const antwort = await fetch(`${API}/expenses/${id}`, { method: "DELETE" });
+    if (!antwort.ok) throw new Error("Status " + antwort.status);
+    await ladeAusgaben();
+  } catch (fehler) {
+    zeigeMeldung("Löschen fehlgeschlagen: " + fehler.message, true);
+  }
+}
+
+filter.addEventListener("change", ladeAusgaben);
+
+ladeAusgaben();
+</script>
+</body>
+</html>
