@@ -34,9 +34,19 @@
 
   .huelle { max-width: 44rem; margin: 0 auto; }
 
-  /* --- Kopfbereich mit Gesamtsumme --- */
+  /* --- Anmeldung --- */
+  .anmeldung { max-width: 22rem; margin: 15vh auto 0; }
+  .anmeldung h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+  .anmeldung p { margin: 0 0 1.5rem; color: var(--gedimmt); }
+  .anmeldung .feld { margin-bottom: 0.9rem; }
+  .anmeldung input { width: 100%; }
+  #anmeldefehler { display: none; margin: 0.9rem 0 0; color: var(--rot); }
+  #anmeldefehler.sichtbar { display: block; }
+
+  /* --- Kopfbereich --- */
   header { border-bottom: 2px solid var(--tinte); padding-bottom: 1.5rem; }
 
+  .kopfzeile { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
   header h1 { margin: 0; font-size: 1rem; font-weight: 500; color: var(--gedimmt); }
 
   #summe {
@@ -66,13 +76,6 @@
 
   form.bearbeitet .bearbeitungshinweis { display: flex; }
 
-  .abbrechen {
-    padding: 0.2rem 0.5rem;
-    background: none;
-    color: var(--gedimmt);
-    border: 1px solid var(--linie);
-  }
-
   .felder { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .feld { display: flex; flex-direction: column; gap: 0.3rem; }
   .feld.breit { grid-column: 1 / -1; }
@@ -95,7 +98,7 @@
 
   button { font: inherit; font-weight: 500; cursor: pointer; border: none; border-radius: 3px; }
 
-  #speichern {
+  .hauptknopf {
     margin-top: 0.9rem;
     width: 100%;
     padding: 0.7rem;
@@ -103,7 +106,17 @@
     color: var(--weiss);
   }
 
-  #speichern:disabled { opacity: 0.55; cursor: progress; }
+  .hauptknopf:disabled { opacity: 0.55; cursor: progress; }
+
+  .nebenknopf {
+    padding: 0.25rem 0.5rem;
+    background: none;
+    color: var(--gedimmt);
+    border: 1px solid var(--linie);
+  }
+
+  .nebenknopf:hover { color: var(--tinte); border-color: var(--gedimmt); }
+  .nebenknopf.loeschen:hover { color: var(--rot); border-color: var(--rot); }
 
   /* --- Auswertung --- */
   .auswertung { margin-top: 2.5rem; }
@@ -122,9 +135,7 @@
   .abschnittskopf input { padding: 0.35rem 0.5rem; }
 
   .kategoriezeile { padding: 0.7rem 0; border-bottom: 1px solid var(--linie); }
-
   .kategoriekopf { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
-
   .kategoriename { font-weight: 500; }
   .kategorieanzahl { color: var(--gedimmt); font-weight: 400; font-size: 0.85rem; }
 
@@ -161,26 +172,39 @@
   .zusatz { display: block; font-size: 0.85rem; color: var(--gedimmt); font-weight: 400; }
   .betrag { font-weight: 600; margin-right: 0.25rem; }
 
-  .zeilenknopf {
-    padding: 0.25rem 0.5rem;
-    background: none;
-    color: var(--gedimmt);
-    border: 1px solid var(--linie);
-  }
-
-  .zeilenknopf:hover { color: var(--tinte); border-color: var(--gedimmt); }
-  .zeilenknopf.loeschen:hover { color: var(--rot); border-color: var(--rot); }
-
   .leer { padding: 0.9rem 0; color: var(--gedimmt); }
   #meldung { margin: 1.25rem 0 0; color: var(--gedimmt); }
   #meldung.fehler { color: var(--rot); }
+
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div class="huelle">
+
+<!-- ================= Anmeldebildschirm ================= -->
+<div class="anmeldung" id="anmeldebereich" hidden>
+  <h1>Finanz-Tracker</h1>
+  <p>Bitte Passwort eingeben.</p>
+
+  <form id="anmeldeformular">
+    <div class="feld">
+      <label for="passwort">Passwort</label>
+      <input type="password" id="passwort" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="hauptknopf" id="anmelden">Anmelden</button>
+  </form>
+
+  <p id="anmeldefehler"></p>
+</div>
+
+<!-- ================= Anwendung ================= -->
+<div class="huelle" id="anwendung" hidden>
 
   <header>
-    <h1>Ausgaben insgesamt</h1>
+    <div class="kopfzeile">
+      <h1>Ausgaben insgesamt</h1>
+      <button type="button" class="nebenknopf" id="abmelden">Abmelden</button>
+    </div>
     <span id="summe">0,00 €</span>
     <p id="summe-hinweis">Noch nichts erfasst.</p>
   </header>
@@ -188,7 +212,7 @@
   <form id="formular">
     <div class="bearbeitungshinweis">
       <span id="bearbeitungstext">Eintrag wird bearbeitet</span>
-      <button type="button" class="abbrechen" id="abbrechen">Abbrechen</button>
+      <button type="button" class="nebenknopf" id="abbrechen">Abbrechen</button>
     </div>
 
     <div class="felder">
@@ -210,7 +234,7 @@
         <input type="text" id="notiz" placeholder="z. B. Wocheneinkauf">
       </div>
     </div>
-    <button type="submit" id="speichern">Ausgabe eintragen</button>
+    <button type="submit" class="hauptknopf" id="speichern">Ausgabe eintragen</button>
   </form>
 
   <section class="auswertung">
@@ -237,6 +261,14 @@
 // Adresse deines Backends. Zum lokalen Testen auf "http://localhost:8000" umstellen.
 const API = "https://finanz-tracker-backend-3knj.onrender.com";
 
+const anmeldebereich  = document.getElementById("anmeldebereich");
+const anwendung       = document.getElementById("anwendung");
+const anmeldeformular = document.getElementById("anmeldeformular");
+const feldPasswort    = document.getElementById("passwort");
+const anmeldeknopf    = document.getElementById("anmelden");
+const anmeldefehler   = document.getElementById("anmeldefehler");
+const abmeldeknopf    = document.getElementById("abmelden");
+
 const formular   = document.getElementById("formular");
 const speichern  = document.getElementById("speichern");
 const abbrechen  = document.getElementById("abbrechen");
@@ -258,19 +290,108 @@ const feldNotiz     = document.getElementById("notiz");
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
 
 let alleKategorien = [];
-// null = neuer Eintrag, sonst die ID des Eintrags, der bearbeitet wird.
 let bearbeiteId = null;
 
-function zeigeMeldung(text, istFehler = false) {
-  meldung.textContent = text;
-  meldung.classList.toggle("fehler", istFehler);
+/* ---------- Token verwalten ----------
+   Der Token wird im Browser gespeichert, damit man nach dem Neuladen
+   angemeldet bleibt. Klappt das nicht (z. B. blockierte Speicherung),
+   halten wir ihn ersatzweise nur im Arbeitsspeicher. */
+let tokenImSpeicher = null;
+
+function holeToken() {
+  try { return localStorage.getItem("finanz_token"); }
+  catch (e) { return tokenImSpeicher; }
 }
 
+function setzeToken(wert) {
+  tokenImSpeicher = wert;
+  try {
+    if (wert) localStorage.setItem("finanz_token", wert);
+    else localStorage.removeItem("finanz_token");
+  } catch (e) { /* Arbeitsspeicher reicht */ }
+}
+
+/* ---------- Anfragen mit Token ----------
+   Eine einzige Stelle, die den Token anhängt und auf 401 reagiert.
+   Dadurch muss keine der Funktionen unten sich darum kümmern. */
+async function anfrage(pfad, optionen = {}) {
+  const kopfzeilen = Object.assign(
+    { "Content-Type": "application/json", "Authorization": `Bearer ${holeToken()}` },
+    optionen.headers || {}
+  );
+
+  const antwort = await fetch(API + pfad, Object.assign({}, optionen, { headers: kopfzeilen }));
+
+  if (antwort.status === 401) {
+    abmelden("Die Anmeldung ist abgelaufen. Bitte erneut anmelden.");
+    throw new Error("nicht angemeldet");
+  }
+  if (!antwort.ok) throw new Error("Status " + antwort.status);
+
+  return antwort.json();
+}
+
+/* ---------- Zwischen Anmeldung und Anwendung umschalten ---------- */
+function zeigeAnwendung() {
+  anmeldebereich.hidden = true;
+  anwendung.hidden = false;
+  ladeAlles();
+}
+
+function zeigeAnmeldung(text = "") {
+  anwendung.hidden = true;
+  anmeldebereich.hidden = false;
+  feldPasswort.value = "";
+  anmeldefehler.textContent = text;
+  anmeldefehler.classList.toggle("sichtbar", Boolean(text));
+  feldPasswort.focus();
+}
+
+function abmelden(text = "") {
+  setzeToken(null);
+  beendeBearbeitung();
+  zeigeAnmeldung(text);
+}
+
+abmeldeknopf.addEventListener("click", () => abmelden());
+
+anmeldeformular.addEventListener("submit", async (ereignis) => {
+  ereignis.preventDefault();
+  anmeldeknopf.disabled = true;
+  anmeldeknopf.textContent = "Wird geprüft …";
+  anmeldefehler.classList.remove("sichtbar");
+
+  try {
+    const antwort = await fetch(`${API}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passwort: feldPasswort.value })
+    });
+
+    if (antwort.status === 401) {
+      anmeldefehler.textContent = "Passwort stimmt nicht.";
+      anmeldefehler.classList.add("sichtbar");
+      return;
+    }
+    if (!antwort.ok) throw new Error("Status " + antwort.status);
+
+    const daten = await antwort.json();
+    setzeToken(daten.token);
+    zeigeAnwendung();
+  } catch (fehler) {
+    anmeldefehler.textContent = "Keine Verbindung zum Server. Beim ersten Versuch kann er noch anlaufen – nach einer Minute nochmal probieren.";
+    anmeldefehler.classList.add("sichtbar");
+  } finally {
+    anmeldeknopf.disabled = false;
+    anmeldeknopf.textContent = "Anmelden";
+  }
+});
+
+/* ---------- Bearbeiten ---------- */
 const heute = new Date();
 feldDatum.valueAsDate = heute;
 monatsfeld.value = heute.toISOString().slice(0, 7);
 
-// --- Zwischen Anlegen und Bearbeiten umschalten ---
 function starteBearbeitung(ausgabe) {
   bearbeiteId = ausgabe.id;
 
@@ -309,35 +430,44 @@ function markiereZeile() {
 
 abbrechen.addEventListener("click", beendeBearbeitung);
 
-// --- Daten laden ---
+function zeigeMeldung(text, istFehler = false) {
+  meldung.textContent = text;
+  meldung.classList.toggle("fehler", istFehler);
+}
+
+/* ---------- Daten laden ---------- */
+function ladeAlles() {
+  return Promise.all([ladeAusgaben(), ladeAuswertung()]);
+}
+
 async function ladeAusgaben() {
   const kategorie = filter.value;
-  const adresse = kategorie
-    ? `${API}/expenses?kategorie=${encodeURIComponent(kategorie)}`
-    : `${API}/expenses`;
+  const pfad = kategorie
+    ? `/expenses?kategorie=${encodeURIComponent(kategorie)}`
+    : "/expenses";
 
   zeigeMeldung("Lade Daten … (beim ersten Mal kann das bis zu einer Minute dauern)");
 
   try {
-    const antwort = await fetch(adresse);
-    if (!antwort.ok) throw new Error("Server antwortet mit Status " + antwort.status);
-    zeichneListe(await antwort.json());
+    zeichneListe(await anfrage(pfad));
     zeigeMeldung("");
   } catch (fehler) {
-    zeigeMeldung("Keine Verbindung zum Backend: " + fehler.message, true);
+    if (fehler.message !== "nicht angemeldet") {
+      zeigeMeldung("Keine Verbindung zum Backend: " + fehler.message, true);
+    }
   }
 }
 
 async function ladeAuswertung() {
   const monat = monatsfeld.value;
-  const adresse = monat ? `${API}/summary?monat=${monat}` : `${API}/summary`;
+  const pfad = monat ? `/summary?monat=${monat}` : "/summary";
 
   try {
-    const antwort = await fetch(adresse);
-    if (!antwort.ok) throw new Error("Status " + antwort.status);
-    zeichneAuswertung(await antwort.json());
+    zeichneAuswertung(await anfrage(pfad));
   } catch (fehler) {
-    kategorienListe.innerHTML = '<p class="leer">Auswertung nicht abrufbar.</p>';
+    if (fehler.message !== "nicht angemeldet") {
+      kategorienListe.innerHTML = '<p class="leer">Auswertung nicht abrufbar.</p>';
+    }
   }
 }
 
@@ -407,14 +537,14 @@ function zeichneListe(ausgaben) {
     betrag.textContent = euro.format(a.betrag);
 
     const bearbeiten = document.createElement("button");
-    bearbeiten.className = "zeilenknopf";
+    bearbeiten.className = "nebenknopf";
     bearbeiten.type = "button";
     bearbeiten.textContent = "Bearbeiten";
     bearbeiten.setAttribute("aria-label", `${a.kategorie} vom ${datum} bearbeiten`);
     bearbeiten.addEventListener("click", () => starteBearbeitung(a));
 
     const loeschknopf = document.createElement("button");
-    loeschknopf.className = "zeilenknopf loeschen";
+    loeschknopf.className = "nebenknopf loeschen";
     loeschknopf.type = "button";
     loeschknopf.textContent = "Löschen";
     loeschknopf.setAttribute("aria-label", `${a.kategorie} vom ${datum} löschen`);
@@ -464,7 +594,7 @@ function fuelleKategorien() {
   filter.value = gewaehlt;
 }
 
-// --- Anlegen oder Ändern, je nach Zustand ---
+/* ---------- Anlegen oder Ändern ---------- */
 formular.addEventListener("submit", async (ereignis) => {
   ereignis.preventDefault();
   speichern.disabled = true;
@@ -478,48 +608,45 @@ formular.addEventListener("submit", async (ereignis) => {
     notiz:     feldNotiz.value.trim() || null
   };
 
-  // Dieselben Daten, nur Adresse und Methode unterscheiden sich.
-  const adresse  = bearbeiteId ? `${API}/expenses/${bearbeiteId}` : `${API}/expenses`;
-  const methode  = bearbeiteId ? "PUT" : "POST";
+  const pfad    = bearbeiteId ? `/expenses/${bearbeiteId}` : "/expenses";
+  const methode = bearbeiteId ? "PUT" : "POST";
 
   try {
-    const antwort = await fetch(adresse, {
-      method: methode,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(daten)
-    });
-    if (!antwort.ok) throw new Error("Status " + antwort.status);
-
+    await anfrage(pfad, { method: methode, body: JSON.stringify(daten) });
     beendeBearbeitung();
     filter.value = "";
-    await Promise.all([ladeAusgaben(), ladeAuswertung()]);
+    await ladeAlles();
   } catch (fehler) {
-    zeigeMeldung("Speichern fehlgeschlagen: " + fehler.message, true);
+    if (fehler.message !== "nicht angemeldet") {
+      zeigeMeldung("Speichern fehlgeschlagen: " + fehler.message, true);
+    }
     speichern.textContent = beschriftung;
   } finally {
     speichern.disabled = false;
   }
 });
 
-// --- Löschen ---
+/* ---------- Löschen ---------- */
 async function loesche(id, kategorie) {
   if (!confirm(`Ausgabe "${kategorie}" wirklich löschen?`)) return;
 
   try {
-    const antwort = await fetch(`${API}/expenses/${id}`, { method: "DELETE" });
-    if (!antwort.ok) throw new Error("Status " + antwort.status);
+    await anfrage(`/expenses/${id}`, { method: "DELETE" });
     if (bearbeiteId === id) beendeBearbeitung();
-    await Promise.all([ladeAusgaben(), ladeAuswertung()]);
+    await ladeAlles();
   } catch (fehler) {
-    zeigeMeldung("Löschen fehlgeschlagen: " + fehler.message, true);
+    if (fehler.message !== "nicht angemeldet") {
+      zeigeMeldung("Löschen fehlgeschlagen: " + fehler.message, true);
+    }
   }
 }
 
 filter.addEventListener("change", ladeAusgaben);
 monatsfeld.addEventListener("change", ladeAuswertung);
 
-ladeAusgaben();
-ladeAuswertung();
+/* ---------- Start ---------- */
+if (holeToken()) zeigeAnwendung();
+else zeigeAnmeldung();
 </script>
 </body>
 </html>

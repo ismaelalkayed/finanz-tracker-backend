@@ -6,6 +6,11 @@ Sonst wuerde main sich mit der echten Neon-Datenbank verbinden.
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["SECRET_KEY"] = "test-geheimnis-nur-fuer-tests"
+
+# bcrypt-Hash des Passworts "geheim123", nur fuer die Tests
+import bcrypt as _bcrypt
+os.environ["PASSWORT_HASH"] = _bcrypt.hashpw(b"geheim123", _bcrypt.gensalt()).decode()
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +22,18 @@ from main import app, engine
 @pytest.fixture
 def client():
     """Jeder Test startet mit einer komplett leeren Datenbank."""
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)
+    with TestClient(app) as c:
+        # Einmal anmelden, Token fuer alle folgenden Anfragen hinterlegen
+        token = c.post("/login", json={"passwort": "geheim123"}).json()["token"]
+        c.headers["Authorization"] = f"Bearer {token}"
+        yield c
+
+
+@pytest.fixture
+def anonym():
+    """Client ohne Anmeldung, fuer die Zugriffstests."""
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     with TestClient(app) as c:
@@ -114,6 +131,7 @@ def test_auswertung_leerer_monat(client):
 def test_auswertung_ungueltiger_monat(client):
     assert client.get("/summary?monat=quatsch").status_code == 400
 
+
 # --- Tests fuer das Bearbeiten ---
 
 def test_aendern(client):
@@ -154,3 +172,57 @@ def test_aendern_unbekannte_id_gibt_404(client):
         "betrag": 1.0, "kategorie": "Test", "datum": "2026-09-01", "notiz": None
     })
     assert antwort.status_code == 404
+
+
+# --- Tests fuer die Anmeldung ---
+
+def test_ohne_token_kein_zugriff(anonym):
+    assert anonym.get("/expenses").status_code == 401
+    assert anonym.post("/expenses", json={
+        "betrag": 1.0, "kategorie": "Test", "datum": "2026-09-01", "notiz": None
+    }).status_code == 401
+    assert anonym.delete("/expenses/1").status_code == 401
+    assert anonym.get("/summary").status_code == 401
+
+
+def test_falsches_passwort(anonym):
+    antwort = anonym.post("/login", json={"passwort": "falsch"})
+    assert antwort.status_code == 401
+    assert "token" not in antwort.json()
+
+
+def test_richtiges_passwort_gibt_token(anonym):
+    antwort = anonym.post("/login", json={"passwort": "geheim123"})
+    assert antwort.status_code == 200
+    assert len(antwort.json()["token"]) > 20
+
+
+def test_gefaelschter_token_wird_abgelehnt(anonym):
+    anonym.headers["Authorization"] = "Bearer ich.bin.kein.token"
+    assert anonym.get("/expenses").status_code == 401
+
+
+def test_token_mit_falschem_geheimnis_wird_abgelehnt(anonym):
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    fremder = jwt.encode(
+        {"sub": "besitzer", "exp": datetime.now(timezone.utc) + timedelta(days=1)},
+        "anderes-geheimnis", algorithm="HS256")
+    anonym.headers["Authorization"] = f"Bearer {fremder}"
+    assert anonym.get("/expenses").status_code == 401
+
+
+def test_abgelaufener_token_wird_abgelehnt(anonym):
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    alt = jwt.encode(
+        {"sub": "besitzer", "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+        os.environ["SECRET_KEY"], algorithm="HS256")
+    anonym.headers["Authorization"] = f"Bearer {alt}"
+    antwort = anonym.get("/expenses")
+    assert antwort.status_code == 401
+    assert antwort.json()["detail"] == "Anmeldung abgelaufen"
+
+
+def test_startseite_bleibt_offen(anonym):
+    assert anonym.get("/").status_code == 200
