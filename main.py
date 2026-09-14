@@ -49,7 +49,6 @@ def get_expenses(kategorie: Optional[str] = None):
             abfrage = abfrage.where(Expense.kategorie == kategorie)
         return session.exec(abfrage).all()
 
-@app.delete("/expenses/{expense_id}")
 @app.put("/expenses/{expense_id}", response_model=ExpenseRead)
 def update_expense(expense_id: int, expense: ExpenseCreate):
     with Session(engine) as session:
@@ -63,15 +62,7 @@ def update_expense(expense_id: int, expense: ExpenseCreate):
         session.refresh(db_expense)
         return db_expense
 
-def delete_expense(expense_id: int):
-    with Session(engine) as session:
-        expense = session.get(Expense, expense_id)
-        if not expense:
-            raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
-        session.delete(expense)
-        session.commit()
-        return {"message": f"Ausgabe {expense_id} gelöscht"}
-    
+
 @app.delete("/expenses/{expense_id}")
 def delete_expense(expense_id: int):
     with Session(engine) as session:
