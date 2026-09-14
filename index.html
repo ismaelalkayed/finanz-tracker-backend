@@ -37,12 +37,7 @@
   /* --- Kopfbereich mit Gesamtsumme --- */
   header { border-bottom: 2px solid var(--tinte); padding-bottom: 1.5rem; }
 
-  header h1 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--gedimmt);
-  }
+  header h1 { margin: 0; font-size: 1rem; font-weight: 500; color: var(--gedimmt); }
 
   #summe {
     display: block;
@@ -57,6 +52,26 @@
 
   /* --- Formular --- */
   form { margin: 2rem 0 0; }
+
+  .bearbeitungshinweis {
+    display: none;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--weiss);
+    border-left: 3px solid var(--gruen);
+  }
+
+  form.bearbeitet .bearbeitungshinweis { display: flex; }
+
+  .abbrechen {
+    padding: 0.2rem 0.5rem;
+    background: none;
+    color: var(--gedimmt);
+    border: 1px solid var(--linie);
+  }
 
   .felder { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .feld { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -108,12 +123,7 @@
 
   .kategoriezeile { padding: 0.7rem 0; border-bottom: 1px solid var(--linie); }
 
-  .kategoriekopf {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
+  .kategoriekopf { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
 
   .kategoriename { font-weight: 500; }
   .kategorieanzahl { color: var(--gedimmt); font-weight: 400; font-size: 0.85rem; }
@@ -138,25 +148,28 @@
 
   li {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto;
     align-items: baseline;
-    gap: 0.75rem;
+    gap: 0.5rem;
     padding: 0.85rem 0;
     border-bottom: 1px solid var(--linie);
   }
 
+  li.in-bearbeitung { background: var(--weiss); }
+
   .titel { font-weight: 500; }
   .zusatz { display: block; font-size: 0.85rem; color: var(--gedimmt); font-weight: 400; }
-  .betrag { font-weight: 600; }
+  .betrag { font-weight: 600; margin-right: 0.25rem; }
 
-  .loeschen {
+  .zeilenknopf {
     padding: 0.25rem 0.5rem;
     background: none;
     color: var(--gedimmt);
     border: 1px solid var(--linie);
   }
 
-  .loeschen:hover { color: var(--rot); border-color: var(--rot); }
+  .zeilenknopf:hover { color: var(--tinte); border-color: var(--gedimmt); }
+  .zeilenknopf.loeschen:hover { color: var(--rot); border-color: var(--rot); }
 
   .leer { padding: 0.9rem 0; color: var(--gedimmt); }
   #meldung { margin: 1.25rem 0 0; color: var(--gedimmt); }
@@ -173,6 +186,11 @@
   </header>
 
   <form id="formular">
+    <div class="bearbeitungshinweis">
+      <span id="bearbeitungstext">Eintrag wird bearbeitet</span>
+      <button type="button" class="abbrechen" id="abbrechen">Abbrechen</button>
+    </div>
+
     <div class="felder">
       <div class="feld">
         <label for="betrag">Betrag in Euro</label>
@@ -221,6 +239,8 @@ const API = "https://finanz-tracker-backend-3knj.onrender.com";
 
 const formular   = document.getElementById("formular");
 const speichern  = document.getElementById("speichern");
+const abbrechen  = document.getElementById("abbrechen");
+const bearbeitungstext = document.getElementById("bearbeitungstext");
 const filter     = document.getElementById("filter");
 const monatsfeld = document.getElementById("monat");
 const liste      = document.getElementById("liste");
@@ -230,21 +250,66 @@ const summe      = document.getElementById("summe");
 const hinweis    = document.getElementById("summe-hinweis");
 const vorschlaege = document.getElementById("kategorien");
 
+const feldBetrag    = document.getElementById("betrag");
+const feldDatum     = document.getElementById("datum");
+const feldKategorie = document.getElementById("kategorie");
+const feldNotiz     = document.getElementById("notiz");
+
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
 
 let alleKategorien = [];
+// null = neuer Eintrag, sonst die ID des Eintrags, der bearbeitet wird.
+let bearbeiteId = null;
 
 function zeigeMeldung(text, istFehler = false) {
   meldung.textContent = text;
   meldung.classList.toggle("fehler", istFehler);
 }
 
-// Heute als Vorbelegung, aktueller Monat für die Auswertung.
 const heute = new Date();
-document.getElementById("datum").valueAsDate = heute;
-monatsfeld.value = heute.toISOString().slice(0, 7);   // Format JJJJ-MM
+feldDatum.valueAsDate = heute;
+monatsfeld.value = heute.toISOString().slice(0, 7);
 
-// --- Einträge laden ---
+// --- Zwischen Anlegen und Bearbeiten umschalten ---
+function starteBearbeitung(ausgabe) {
+  bearbeiteId = ausgabe.id;
+
+  feldBetrag.value    = ausgabe.betrag;
+  feldDatum.value     = ausgabe.datum;
+  feldKategorie.value = ausgabe.kategorie;
+  feldNotiz.value     = ausgabe.notiz || "";
+
+  formular.classList.add("bearbeitet");
+  bearbeitungstext.textContent =
+    `Eintrag vom ${new Date(ausgabe.datum).toLocaleDateString("de-DE")} wird bearbeitet`;
+  speichern.textContent = "Änderung speichern";
+
+  formular.scrollIntoView({ behavior: "smooth", block: "center" });
+  feldBetrag.focus();
+  markiereZeile();
+}
+
+function beendeBearbeitung() {
+  bearbeiteId = null;
+  formular.classList.remove("bearbeitet");
+  speichern.textContent = "Ausgabe eintragen";
+
+  feldBetrag.value = "";
+  feldNotiz.value = "";
+  feldKategorie.value = "";
+  feldDatum.valueAsDate = new Date();
+  markiereZeile();
+}
+
+function markiereZeile() {
+  for (const zeile of liste.children) {
+    zeile.classList.toggle("in-bearbeitung", Number(zeile.dataset.id) === bearbeiteId);
+  }
+}
+
+abbrechen.addEventListener("click", beendeBearbeitung);
+
+// --- Daten laden ---
 async function ladeAusgaben() {
   const kategorie = filter.value;
   const adresse = kategorie
@@ -263,7 +328,6 @@ async function ladeAusgaben() {
   }
 }
 
-// --- Auswertung laden ---
 async function ladeAuswertung() {
   const monat = monatsfeld.value;
   const adresse = monat ? `${API}/summary?monat=${monat}` : `${API}/summary`;
@@ -285,7 +349,6 @@ function zeichneAuswertung(gruppen) {
     return;
   }
 
-  // Größte Kategorie bestimmt die volle Balkenbreite.
   const groesste = Math.max(...gruppen.map(g => g.summe));
 
   for (const g of gruppen) {
@@ -323,10 +386,11 @@ function zeichneAuswertung(gruppen) {
 
 function zeichneListe(ausgaben) {
   liste.innerHTML = "";
-  ausgaben.sort((a, b) => b.datum.localeCompare(a.datum));   // neueste zuerst
+  ausgaben.sort((a, b) => b.datum.localeCompare(a.datum));
 
   for (const a of ausgaben) {
     const zeile = document.createElement("li");
+    zeile.dataset.id = a.id;
 
     const text = document.createElement("span");
     text.className = "titel";
@@ -342,14 +406,21 @@ function zeichneListe(ausgaben) {
     betrag.className = "betrag";
     betrag.textContent = euro.format(a.betrag);
 
-    const knopf = document.createElement("button");
-    knopf.className = "loeschen";
-    knopf.type = "button";
-    knopf.textContent = "Löschen";
-    knopf.setAttribute("aria-label", `${a.kategorie} vom ${datum} löschen`);
-    knopf.addEventListener("click", () => loesche(a.id, a.kategorie));
+    const bearbeiten = document.createElement("button");
+    bearbeiten.className = "zeilenknopf";
+    bearbeiten.type = "button";
+    bearbeiten.textContent = "Bearbeiten";
+    bearbeiten.setAttribute("aria-label", `${a.kategorie} vom ${datum} bearbeiten`);
+    bearbeiten.addEventListener("click", () => starteBearbeitung(a));
 
-    zeile.append(text, betrag, knopf);
+    const loeschknopf = document.createElement("button");
+    loeschknopf.className = "zeilenknopf loeschen";
+    loeschknopf.type = "button";
+    loeschknopf.textContent = "Löschen";
+    loeschknopf.setAttribute("aria-label", `${a.kategorie} vom ${datum} löschen`);
+    loeschknopf.addEventListener("click", () => loesche(a.id, a.kategorie));
+
+    zeile.append(text, betrag, bearbeiten, loeschknopf);
     liste.appendChild(zeile);
   }
 
@@ -371,6 +442,8 @@ function zeichneListe(ausgaben) {
     alleKategorien = [...new Set(ausgaben.map(a => a.kategorie))].sort();
     fuelleKategorien();
   }
+
+  markiereZeile();
 }
 
 function fuelleKategorien() {
@@ -391,46 +464,51 @@ function fuelleKategorien() {
   filter.value = gewaehlt;
 }
 
-// --- Neue Ausgabe anlegen ---
+// --- Anlegen oder Ändern, je nach Zustand ---
 formular.addEventListener("submit", async (ereignis) => {
   ereignis.preventDefault();
   speichern.disabled = true;
+  const beschriftung = speichern.textContent;
   speichern.textContent = "Wird gespeichert …";
 
   const daten = {
-    betrag:    parseFloat(document.getElementById("betrag").value),
-    kategorie: document.getElementById("kategorie").value.trim(),
-    datum:     document.getElementById("datum").value,
-    notiz:     document.getElementById("notiz").value.trim() || null
+    betrag:    parseFloat(feldBetrag.value),
+    kategorie: feldKategorie.value.trim(),
+    datum:     feldDatum.value,
+    notiz:     feldNotiz.value.trim() || null
   };
 
+  // Dieselben Daten, nur Adresse und Methode unterscheiden sich.
+  const adresse  = bearbeiteId ? `${API}/expenses/${bearbeiteId}` : `${API}/expenses`;
+  const methode  = bearbeiteId ? "PUT" : "POST";
+
   try {
-    const antwort = await fetch(`${API}/expenses`, {
-      method: "POST",
+    const antwort = await fetch(adresse, {
+      method: methode,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(daten)
     });
     if (!antwort.ok) throw new Error("Status " + antwort.status);
 
-    document.getElementById("betrag").value = "";
-    document.getElementById("notiz").value = "";
+    beendeBearbeitung();
     filter.value = "";
     await Promise.all([ladeAusgaben(), ladeAuswertung()]);
   } catch (fehler) {
     zeigeMeldung("Speichern fehlgeschlagen: " + fehler.message, true);
+    speichern.textContent = beschriftung;
   } finally {
     speichern.disabled = false;
-    speichern.textContent = "Ausgabe eintragen";
   }
 });
 
-// --- Ausgabe löschen ---
+// --- Löschen ---
 async function loesche(id, kategorie) {
   if (!confirm(`Ausgabe "${kategorie}" wirklich löschen?`)) return;
 
   try {
     const antwort = await fetch(`${API}/expenses/${id}`, { method: "DELETE" });
     if (!antwort.ok) throw new Error("Status " + antwort.status);
+    if (bearbeiteId === id) beendeBearbeitung();
     await Promise.all([ladeAusgaben(), ladeAuswertung()]);
   } catch (fehler) {
     zeigeMeldung("Löschen fehlgeschlagen: " + fehler.message, true);

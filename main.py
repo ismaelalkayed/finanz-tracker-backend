@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from sqlalchemy import func
 from datetime import date
 from calendar import monthrange
@@ -16,17 +17,18 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./finanzen.db")
 
 engine = create_engine(DATABASE_URL)
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SQLModel.metadata.create_all(engine)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def on_startup():
-    SQLModel.metadata.create_all(engine)
 
 @app.get("/")
 def read_root():
