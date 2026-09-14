@@ -1,10 +1,15 @@
-from fastapi.middleware.cors import CORSMiddleware # type: ignore
-from fastapi import FastAPI, HTTPException # type: ignore
-from sqlmodel import SQLModel, Session, create_engine, select # type: ignore
+import os
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import SQLModel, Session, create_engine, select
 from typing import Optional
 from models import Expense, ExpenseCreate, ExpenseRead
 
-DATABASE_URL = "sqlite:///./finanzen.db"
+load_dotenv()
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./finanzen.db")
+
 engine = create_engine(DATABASE_URL)
 
 app = FastAPI()
