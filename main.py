@@ -33,7 +33,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://ismaelalkayed.github.io",   # Meine veröffentlichte Oberfläche
+        "null",                              # index.html lokal per Doppelklick geöffnet
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
