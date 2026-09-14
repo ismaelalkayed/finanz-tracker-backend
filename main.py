@@ -1,3 +1,6 @@
+from sqlalchemy import func
+from datetime import date
+from calendar import monthrange
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -78,3 +81,28 @@ def delete_expense(expense_id: int):
         session.delete(expense)
         session.commit()
         return {"ok": True, "geloescht": expense_id}
+    
+@app.get("/summary")
+def get_summary(monat: Optional[str] = None):
+    with Session(engine) as session:
+        abfrage = (
+            select(Expense.kategorie,
+                   func.sum(Expense.betrag).label("summe"),
+                   func.count(Expense.id).label("anzahl"))
+            .group_by(Expense.kategorie)
+            .order_by(func.sum(Expense.betrag).desc())
+        )
+        if monat:
+            try:
+                jahr, nummer = int(monat[:4]), int(monat[5:7])
+                erster = date(jahr, nummer, 1)
+                letzter = date(jahr, nummer, monthrange(jahr, nummer)[1])
+            except (ValueError, IndexError):
+                raise HTTPException(status_code=400, detail="Monat bitte als JJJJ-MM angeben")
+            abfrage = abfrage.where(Expense.datum >= erster, Expense.datum <= letzter)
+
+        zeilen = session.exec(abfrage).all()
+        return [
+            {"kategorie": k, "summe": round(float(s), 2), "anzahl": a}
+            for k, s, a in zeilen
+        ]

@@ -14,6 +14,7 @@
     --gedimmt: #6a746e;
     --linie:   #d8dcd6;
     --gruen:   #1f6f5c;
+    --balken:  #b9cdc5;
     --rot:     #a33b2e;
     --weiss:   #ffffff;
   }
@@ -41,7 +42,6 @@
     font-size: 1rem;
     font-weight: 500;
     color: var(--gedimmt);
-    letter-spacing: 0.01em;
   }
 
   #summe {
@@ -58,12 +58,7 @@
   /* --- Formular --- */
   form { margin: 2rem 0 0; }
 
-  .felder {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-
+  .felder { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .feld { display: flex; flex-direction: column; gap: 0.3rem; }
   .feld.breit { grid-column: 1 / -1; }
 
@@ -83,13 +78,7 @@
     outline-offset: 1px;
   }
 
-  button {
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    border-radius: 3px;
-  }
+  button { font: inherit; font-weight: 500; cursor: pointer; border: none; border-radius: 3px; }
 
   #speichern {
     margin-top: 0.9rem;
@@ -101,7 +90,38 @@
 
   #speichern:disabled { opacity: 0.55; cursor: progress; }
 
-  /* --- Filterzeile --- */
+  /* --- Auswertung --- */
+  .auswertung { margin-top: 2.5rem; }
+
+  .abschnittskopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--linie);
+  }
+
+  .abschnittskopf h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .abschnittskopf input { padding: 0.35rem 0.5rem; }
+
+  .kategoriezeile { padding: 0.7rem 0; border-bottom: 1px solid var(--linie); }
+
+  .kategoriekopf {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .kategoriename { font-weight: 500; }
+  .kategorieanzahl { color: var(--gedimmt); font-weight: 400; font-size: 0.85rem; }
+
+  .schiene { height: 5px; margin-top: 0.4rem; background: var(--linie); border-radius: 3px; }
+  .schiene span { display: block; height: 100%; background: var(--balken); border-radius: 3px; }
+
+  /* --- Filter und Liste --- */
   .filterzeile {
     display: flex;
     align-items: center;
@@ -114,7 +134,6 @@
   .filterzeile label { flex: 0 0 auto; }
   .filterzeile select { flex: 1 1 auto; padding: 0.4rem 0.5rem; }
 
-  /* --- Liste --- */
   ul { list-style: none; margin: 0; padding: 0; }
 
   li {
@@ -139,6 +158,7 @@
 
   .loeschen:hover { color: var(--rot); border-color: var(--rot); }
 
+  .leer { padding: 0.9rem 0; color: var(--gedimmt); }
   #meldung { margin: 1.25rem 0 0; color: var(--gedimmt); }
   #meldung.fehler { color: var(--rot); }
 </style>
@@ -175,6 +195,14 @@
     <button type="submit" id="speichern">Ausgabe eintragen</button>
   </form>
 
+  <section class="auswertung">
+    <div class="abschnittskopf">
+      <h2>Wofür das Geld draufgeht</h2>
+      <input type="month" id="monat" aria-label="Monat der Auswertung">
+    </div>
+    <div id="kategorien-liste"></div>
+  </section>
+
   <div class="filterzeile">
     <label for="filter">Zeigen:</label>
     <select id="filter">
@@ -191,18 +219,19 @@
 // Adresse deines Backends. Zum lokalen Testen auf "http://localhost:8000" umstellen.
 const API = "https://finanz-tracker-backend-3knj.onrender.com";
 
-const formular  = document.getElementById("formular");
-const speichern = document.getElementById("speichern");
-const filter    = document.getElementById("filter");
-const liste     = document.getElementById("liste");
-const meldung   = document.getElementById("meldung");
-const summe     = document.getElementById("summe");
-const hinweis   = document.getElementById("summe-hinweis");
+const formular   = document.getElementById("formular");
+const speichern  = document.getElementById("speichern");
+const filter     = document.getElementById("filter");
+const monatsfeld = document.getElementById("monat");
+const liste      = document.getElementById("liste");
+const kategorienListe = document.getElementById("kategorien-liste");
+const meldung    = document.getElementById("meldung");
+const summe      = document.getElementById("summe");
+const hinweis    = document.getElementById("summe-hinweis");
 const vorschlaege = document.getElementById("kategorien");
 
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
 
-// Alle bisher verwendeten Kategorien, damit Filter und Vorschlagsliste gefüllt sind.
 let alleKategorien = [];
 
 function zeigeMeldung(text, istFehler = false) {
@@ -210,10 +239,12 @@ function zeigeMeldung(text, istFehler = false) {
   meldung.classList.toggle("fehler", istFehler);
 }
 
-// Heutiges Datum als Vorbelegung im Formular.
-document.getElementById("datum").valueAsDate = new Date();
+// Heute als Vorbelegung, aktueller Monat für die Auswertung.
+const heute = new Date();
+document.getElementById("datum").valueAsDate = heute;
+monatsfeld.value = heute.toISOString().slice(0, 7);   // Format JJJJ-MM
 
-// --- Ausgaben laden und anzeigen ---
+// --- Einträge laden ---
 async function ladeAusgaben() {
   const kategorie = filter.value;
   const adresse = kategorie
@@ -225,19 +256,74 @@ async function ladeAusgaben() {
   try {
     const antwort = await fetch(adresse);
     if (!antwort.ok) throw new Error("Server antwortet mit Status " + antwort.status);
-    const ausgaben = await antwort.json();
-    zeichneListe(ausgaben);
+    zeichneListe(await antwort.json());
     zeigeMeldung("");
   } catch (fehler) {
     zeigeMeldung("Keine Verbindung zum Backend: " + fehler.message, true);
   }
 }
 
+// --- Auswertung laden ---
+async function ladeAuswertung() {
+  const monat = monatsfeld.value;
+  const adresse = monat ? `${API}/summary?monat=${monat}` : `${API}/summary`;
+
+  try {
+    const antwort = await fetch(adresse);
+    if (!antwort.ok) throw new Error("Status " + antwort.status);
+    zeichneAuswertung(await antwort.json());
+  } catch (fehler) {
+    kategorienListe.innerHTML = '<p class="leer">Auswertung nicht abrufbar.</p>';
+  }
+}
+
+function zeichneAuswertung(gruppen) {
+  kategorienListe.innerHTML = "";
+
+  if (gruppen.length === 0) {
+    kategorienListe.innerHTML = '<p class="leer">In diesem Monat keine Ausgaben.</p>';
+    return;
+  }
+
+  // Größte Kategorie bestimmt die volle Balkenbreite.
+  const groesste = Math.max(...gruppen.map(g => g.summe));
+
+  for (const g of gruppen) {
+    const zeile = document.createElement("div");
+    zeile.className = "kategoriezeile";
+
+    const kopf = document.createElement("div");
+    kopf.className = "kategoriekopf";
+
+    const name = document.createElement("span");
+    name.className = "kategoriename";
+    name.textContent = g.kategorie;
+
+    const anzahl = document.createElement("span");
+    anzahl.className = "kategorieanzahl";
+    anzahl.textContent = g.anzahl === 1 ? " · 1 Eintrag" : ` · ${g.anzahl} Einträge`;
+    name.appendChild(anzahl);
+
+    const betrag = document.createElement("span");
+    betrag.className = "betrag";
+    betrag.textContent = euro.format(g.summe);
+
+    kopf.append(name, betrag);
+
+    const schiene = document.createElement("div");
+    schiene.className = "schiene";
+    const balken = document.createElement("span");
+    balken.style.width = (g.summe / groesste * 100) + "%";
+    schiene.appendChild(balken);
+
+    zeile.append(kopf, schiene);
+    kategorienListe.appendChild(zeile);
+  }
+}
+
 function zeichneListe(ausgaben) {
   liste.innerHTML = "";
-
-  // Neueste zuerst.
-  ausgaben.sort((a, b) => b.datum.localeCompare(a.datum));
+  ausgaben.sort((a, b) => b.datum.localeCompare(a.datum));   // neueste zuerst
 
   for (const a of ausgaben) {
     const zeile = document.createElement("li");
@@ -281,7 +367,6 @@ function zeichneListe(ausgaben) {
       : `${ausgaben.length} ${wort}`;
   }
 
-  // Kategorienliste nur aus der ungefilterten Ansicht aufbauen.
   if (!filter.value) {
     alleKategorien = [...new Set(ausgaben.map(a => a.kategorie))].sort();
     fuelleKategorien();
@@ -308,7 +393,7 @@ function fuelleKategorien() {
 
 // --- Neue Ausgabe anlegen ---
 formular.addEventListener("submit", async (ereignis) => {
-  ereignis.preventDefault();           // verhindert das Neuladen der Seite
+  ereignis.preventDefault();
   speichern.disabled = true;
   speichern.textContent = "Wird gespeichert …";
 
@@ -329,8 +414,8 @@ formular.addEventListener("submit", async (ereignis) => {
 
     document.getElementById("betrag").value = "";
     document.getElementById("notiz").value = "";
-    filter.value = "";                 // zurück auf die Gesamtansicht
-    await ladeAusgaben();
+    filter.value = "";
+    await Promise.all([ladeAusgaben(), ladeAuswertung()]);
   } catch (fehler) {
     zeigeMeldung("Speichern fehlgeschlagen: " + fehler.message, true);
   } finally {
@@ -346,15 +431,17 @@ async function loesche(id, kategorie) {
   try {
     const antwort = await fetch(`${API}/expenses/${id}`, { method: "DELETE" });
     if (!antwort.ok) throw new Error("Status " + antwort.status);
-    await ladeAusgaben();
+    await Promise.all([ladeAusgaben(), ladeAuswertung()]);
   } catch (fehler) {
     zeigeMeldung("Löschen fehlgeschlagen: " + fehler.message, true);
   }
 }
 
 filter.addEventListener("change", ladeAusgaben);
+monatsfeld.addEventListener("change", ladeAuswertung);
 
 ladeAusgaben();
+ladeAuswertung();
 </script>
 </body>
 </html>
