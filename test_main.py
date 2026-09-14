@@ -113,3 +113,44 @@ def test_auswertung_leerer_monat(client):
 
 def test_auswertung_ungueltiger_monat(client):
     assert client.get("/summary?monat=quatsch").status_code == 400
+
+# --- Tests fuer das Bearbeiten ---
+
+def test_aendern(client):
+    id_ = lege_an(client, 10.0, "Transport", "2026-09-01", "Bahn").json()["id"]
+
+    antwort = client.put(f"/expenses/{id_}", json={
+        "betrag": 12.50, "kategorie": "Transport", "datum": "2026-09-03", "notiz": "Bahn, teurer"
+    })
+    assert antwort.status_code == 200
+    assert antwort.json()["betrag"] == 12.50
+    assert antwort.json()["id"] == id_          # ID bleibt dieselbe
+
+
+def test_aendern_wirkt_dauerhaft(client):
+    id_ = lege_an(client, 10.0, "Transport", "2026-09-01").json()["id"]
+    client.put(f"/expenses/{id_}", json={
+        "betrag": 99.0, "kategorie": "Miete", "datum": "2026-09-01", "notiz": None
+    })
+
+    eintraege = client.get("/expenses").json()
+    assert len(eintraege) == 1                   # kein zweiter Eintrag entstanden
+    assert eintraege[0]["kategorie"] == "Miete"
+    assert eintraege[0]["betrag"] == 99.0
+
+
+def test_aendern_verschiebt_die_auswertung(client):
+    id_ = lege_an(client, 20.0, "Transport", "2026-09-01").json()["id"]
+    client.put(f"/expenses/{id_}", json={
+        "betrag": 20.0, "kategorie": "Lebensmittel", "datum": "2026-09-01", "notiz": None
+    })
+
+    auswertung = client.get("/summary?monat=2026-09").json()
+    assert auswertung == [{"kategorie": "Lebensmittel", "summe": 20.0, "anzahl": 1}]
+
+
+def test_aendern_unbekannte_id_gibt_404(client):
+    antwort = client.put("/expenses/999", json={
+        "betrag": 1.0, "kategorie": "Test", "datum": "2026-09-01", "notiz": None
+    })
+    assert antwort.status_code == 404
